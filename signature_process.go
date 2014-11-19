@@ -1,92 +1,92 @@
 package main
 
 import (
-    "io/ioutil"
-    "log"
-    "net/url"
-    "net/http"
-    "encoding/json"
-    "sync"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
+	"sync"
 )
 
 type signature_response struct {
-    Status int
-    Signatures map[string]interface{}
-    ResponseTime int `json:"response_time"`
+	Status       int
+	Signatures   map[string]interface{}
+	ResponseTime int `json:"response_time"`
 }
 
-func processSignatureChecks(cache_dir, base_endpoint, access_token string, sigCheckChan chan UploadJob, uploadChan chan <- UploadJob, doneChan chan <- UploadJob){
-    var wg sync.WaitGroup
+func processSignatureChecks(cache_dir, base_endpoint, access_token string, sigCheckChan chan UploadJob, uploadChan chan<- UploadJob, doneChan chan<- UploadJob) {
+	var wg sync.WaitGroup
 
-    for job := range sigCheckChan {
-        wg.Add(1)
+	for job := range sigCheckChan {
+		wg.Add(1)
 
-        go func(job UploadJob){
-            defer wg.Done()
-            api_url, err := url.Parse(base_endpoint)
+		go func(job UploadJob) {
+			defer wg.Done()
+			api_url, err := url.Parse(base_endpoint)
 
-            if err != nil {
-                panic(err)
-            }
+			if err != nil {
+				panic(err)
+			}
 
-            api_url.Path = "/medias/check_signatures"
+			api_url.Path = "/medias/check_signatures"
 
-            queryValues := url.Values{}
+			queryValues := url.Values{}
 
-            queryValues.Add("access_token", access_token)
-            queryValues.Add("signatures", job.fileHash)
+			queryValues.Add("access_token", access_token)
+			queryValues.Add("signatures", job.fileHash)
 
-            queryString := queryValues.Encode()
+			queryString := queryValues.Encode()
 
-            api_url.RawQuery = queryString
+			api_url.RawQuery = queryString
 
-            func(req_url string){
-                log.Printf("Checking %s\n", job.filePath)
-                resp, err := http.Get(req_url)
-                
-                if err != nil || resp.StatusCode != 200{
-                    log.Printf("Failed to get %s - %s\n", req_url, err)
-                    return
-                }
+			func(req_url string) {
+				log.Printf("Checking %s\n", job.filePath)
+				resp, err := http.Get(req_url)
 
-                defer resp.Body.Close()
+				if err != nil || resp.StatusCode != 200 {
+					log.Printf("Failed to get %s - %s\n", req_url, err)
+					return
+				}
 
-                body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
 
-                if err != nil {
-                    log.Printf("Failed to read %s - %s\n", req_url, err)
-                    return
-                }
+				body, err := ioutil.ReadAll(resp.Body)
 
-                response := signature_response{}
+				if err != nil {
+					log.Printf("Failed to read %s - %s\n", req_url, err)
+					return
+				}
 
-                err = json.Unmarshal(body, &response)
+				response := signature_response{}
 
-                if err != nil {
-                    log.Printf("Failed to parse %s - %s\n", req_url, err)
-                    return
-                }
+				err = json.Unmarshal(body, &response)
 
-                if response.Status != 20000 {
-                    log.Printf("Bad response %s - %d\n", req_url, response.Status)
-                    return
-                }
+				if err != nil {
+					log.Printf("Failed to parse %s - %s\n", req_url, err)
+					return
+				}
 
-                log.Println(req_url)
-                log.Println(response.Signatures)
+				if response.Status != 20000 {
+					log.Printf("Bad response %s - %d\n", req_url, response.Status)
+					return
+				}
 
-                if response.Signatures[job.fileHash] == nil {
-                    log.Printf("Queuing %s for upload.\n", job.filePath)
-                    uploadChan <- job
-                } else {
-                    job.uploaded = true
-                    job.AddToCache(cache_dir)
-                    doneChan <- job
-                }
+				log.Println(req_url)
+				log.Println(response.Signatures)
 
-            }(api_url.String())
-        }(job)
-    }
-    wg.Wait()
-    close(uploadChan)
+				if response.Signatures[job.fileHash] == nil {
+					log.Printf("Queuing %s for upload.\n", job.filePath)
+					uploadChan <- job
+				} else {
+					job.uploaded = true
+					job.AddToCache(cache_dir)
+					doneChan <- job
+				}
+
+			}(api_url.String())
+		}(job)
+	}
+	wg.Wait()
+	close(uploadChan)
 }
