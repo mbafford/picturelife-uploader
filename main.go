@@ -3,15 +3,17 @@ package main
 import (
 	"flag"
 	"log"
+	"strings"
 )
 
 func main() {
 	// Command line parsing.
-	var base_endpoint, access_token, cache_dir string
+	var base_endpoint, access_token, cache_dir, file_types string
 
 	flag.StringVar(&base_endpoint, "base_endpoint", "https://api.picturelife.com/", "API base endpoint location.")
 	flag.StringVar(&access_token, "token", "", "API access token.")
 	flag.StringVar(&cache_dir, "cache_dir", "./", "Path to where to store hash cache.")
+	flag.StringVar(&file_types, "file_types", "AVI,MOV,JPG,JPEG,NEF", "File types to process (comma separated)")
 
 	flag.Parse()
 
@@ -32,12 +34,15 @@ func main() {
 
 	// Walks directories in one goroutine.
 	go func() {
-		walk(scanPaths, hashChan)
-	}()
+		file_types = strings.ToLower(strings.TrimSpace(file_types))
+		fileTypes := strings.Split(file_types, ",")
+		if len(file_types) == 0 {
+			fileTypes = nil
+		} else {
+			log.Printf("Limiting search to files of the specified types: %s", strings.Join(fileTypes, " | "))
+		}
 
-	// Hashes files in another goroutine.
-	go func() {
-		processHashChan(cache_dir, hashChan, sigCheckChan)
+		walk(scanPaths, fileTypes, hashChan)
 	}()
 
 	go func() {
