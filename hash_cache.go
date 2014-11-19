@@ -49,8 +49,6 @@ func (job *UploadJob) AddToCache(cache_dir string) (err error) {
 func (job *UploadJob) GetFromCache(cache_dir string) (err error) {
 	cachePath := path.Join(cache_dir, job.filePath)
 
-	fmt.Println(cachePath)
-
 	cacheFile, err := os.Open(cachePath)
 
 	if err != nil {
