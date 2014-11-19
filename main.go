@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -18,7 +19,9 @@ func main() {
 	flag.Parse()
 
 	if !(len(access_token) > 0) {
-		panic("Required arguments were not supplied.")
+		log.Printf("Required arguments were not supplied.")
+		os.Exit(1)
+		return
 	}
 
 	// Paths to walk.
